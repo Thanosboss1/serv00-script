@@ -34,7 +34,7 @@ except json.JSONDecodeError:
     send_telegram_message(telegram_token, telegram_chat_id, error_message)
     exit(1)
 
-# 初始化汇总消息
+# 初始化统计变量
 success_count = 0
 failed_servers = []
 
@@ -54,21 +54,16 @@ for server in servers:
     # 执行恢复命令（这里假设使用 SSH 连接和密码认证）
     restore_command = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no -p {port} {username}@{host} '{cron_command}'"
     try:
-        subprocess.check_output(restore_command, shell=True, stderr=subprocess.STDOUT)
+        output = subprocess.check_output(restore_command, shell=True, stderr=subprocess.STDOUT)
         success_count += 1
     except subprocess.CalledProcessError as e:
         failed_servers.append(host)
-        print(f"无法恢复 {host} 上的 vless 服务：{e.output.decode('utf-8')}")
-    except Exception as e:
-        failed_servers.append(host)
-        print(f"无法恢复 {host} 上的 vless 服务：{str(e)}")
 
-# 构建汇总消息
+# 准备汇总消息
+summary_message = f"serv00-vless 恢复操作结果：\n成功的服务器数量：{success_count}\n"
+
 if failed_servers:
-    failed_ids = "\n".join(failed_servers)
-    summary_message = f"成功恢复服务的数量：{success_count}\n\n以下服务器恢复失败：\n{failed_ids}"
-else:
-    summary_message = f"成功恢复服务的数量：{success_count}\n所有服务器恢复成功。"
+    summary_message += "无法恢复的服务器ID：\n" + "\n".join(failed_servers)
 
 # 发送汇总消息到 Telegram
 send_telegram_message(telegram_token, telegram_chat_id, summary_message)
