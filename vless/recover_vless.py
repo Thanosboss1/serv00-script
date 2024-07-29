@@ -4,6 +4,7 @@ import subprocess
 import requests
 
 def send_telegram_message(token, chat_id, message):
+    """Send a message to a Telegram chat."""
     telegram_url = f"https://api.telegram.org/bot{token}/sendMessage"
     telegram_payload = {
         "chat_id": chat_id,
@@ -20,12 +21,12 @@ def send_telegram_message(token, chat_id, message):
     else:
         print("发送 Telegram 消息成功")
 
-# 从环境变量中获取密钥
+# Get tokens and chat ID from environment variables
 accounts_json = os.getenv('ACCOUNTS_JSON')
 telegram_token = os.getenv('TELEGRAM_TOKEN')
 telegram_chat_id = os.getenv('TELEGRAM_CHAT_ID')
 
-# 检查并解析 JSON 字符串
+# Check and parse JSON string
 try:
     servers = json.loads(accounts_json)
 except json.JSONDecodeError:
@@ -34,14 +35,13 @@ except json.JSONDecodeError:
     send_telegram_message(telegram_token, telegram_chat_id, error_message)
     exit(1)
 
-# 初始化统计变量
-success_count = 0
-failed_servers = []
+# Initialize summary message
+summary_message = "vless 恢复操作结果：\n"
 
-# 默认恢复命令
+# Default restore command
 default_restore_command = "~/.npm-global/bin/pm2 resurrect"
 
-# 遍历服务器列表并执行恢复操作
+# Iterate over server list and perform restore operation
 for server in servers:
     host = server['host']
     port = server['port']
@@ -51,19 +51,13 @@ for server in servers:
 
     print(f"连接到 {host}...")
 
-    # 执行恢复命令（这里假设使用 SSH 连接和密码认证）
+    # Execute restore command (assuming SSH connection with password authentication)
     restore_command = f"sshpass -p '{password}' ssh -o StrictHostKeyChecking=no -p {port} {username}@{host} '{cron_command}'"
     try:
         output = subprocess.check_output(restore_command, shell=True, stderr=subprocess.STDOUT)
-        success_count += 1
+        summary_message += f"\n成功恢复 {host} 上的 vless 服务：\n{output.decode('utf-8')}"
     except subprocess.CalledProcessError as e:
-        failed_servers.append(host)
+        summary_message += f"\n无法恢复 {host} 上的 vless 服务：\n{e.output.decode('utf-8')}"
 
-# 准备汇总消息
-summary_message = f"serv00-vless 恢复操作结果：\n成功的服务器数量：{success_count}\n"
-
-if failed_servers:
-    summary_message += "无法恢复的服务器ID：\n" + "\n".join(failed_servers)
-
-# 发送汇总消息到 Telegram
+# Send summary message to Telegram
 send_telegram_message(telegram_token, telegram_chat_id, summary_message)
